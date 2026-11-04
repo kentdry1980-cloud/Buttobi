@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#10172b">
+<title>声でぶっ飛ばせ！</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background:#10172b; color:#fff; font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN",sans-serif; overflow:hidden; }
+  .app { min-height:100vh; display:flex; flex-direction:column; padding: max(14px,env(safe-area-inset-top)) 16px max(14px,env(safe-area-inset-bottom)); gap:12px; }
+  header { text-align:center; }
+  h1 { margin:0; font-size:clamp(24px,6vw,34px); letter-spacing:.04em; }
+  .sub { color:#b8c5e8; font-size:13px; margin-top:4px; }
+  #scene { position:relative; flex:1; min-height:300px; overflow:hidden; border:1px solid #3d4a70; border-radius:22px; background:linear-gradient(#182c50 0%,#45678b 52%,#b2d5e5 100%); }
+  .sun { position:absolute; width:70px;height:70px;border-radius:50%; background:#ffe8a1; right:12%;top:9%;box-shadow:0 0 45px #ffe8a1aa; }
+  .horizon { position:absolute; left:0;right:0;top:57%;height:43%; background:linear-gradient(#718da0,#293e59); clip-path:polygon(0 0,100% 0,100% 100%,0 100%); }
+  .ground { position:absolute; left:-70%; width:240%; height:100%; top:0; transform:perspective(180px) rotateX(35deg); transform-origin:top center; background-image:linear-gradient(#d4efff55 1px,transparent 1px),linear-gradient(90deg,#d4efff55 1px,transparent 1px); background-size:100% 34px,42px 100%; }
+  #distanceMark { position:absolute; top:60%;left:50%; transform:translate(-50%,-50%); color:#fff9; font-size:12px; white-space:nowrap; }
+  #person { position:absolute; left:50%; top:57%; width:110px;height:150px; transform:translate(-50%,-50%) scale(1); transform-origin:center; transition:filter .1s; z-index:3; }
+  .shadow { position:absolute; width:70px;height:15px;border-radius:50%;background:#14243b88;left:50%;top:70%;transform:translateX(-50%);filter:blur(5px); }
+  .head { position:absolute;left:36px;top:0;width:40px;height:43px;border-radius:48% 48% 45% 45%;background:#ffd2ad;border:3px solid #26344b; }
+  .hair { position:absolute;left:35px;top:-3px;width:43px;height:19px;border-radius:50% 50% 20% 20%;background:#332a29;z-index:2; }
+  .body { position:absolute;left:24px;top:43px;width:64px;height:67px;border-radius:19px 19px 12px 12px;background:#ff765e;border:3px solid #26344b; }
+  .arm { position:absolute;top:50px;width:19px;height:59px;border-radius:12px;background:#ffd2ad;border:3px solid #26344b; }
+  .arm.l {left:10px;transform:rotate(18deg)} .arm.r {right:10px;transform:rotate(-18deg)}
+  .leg { position:absolute;top:103px;width:24px;height:47px;border-radius:8px;background:#263c69;border:3px solid #17243a; }
+  .leg.l {left:28px;transform:rotate(8deg)} .leg.r {right:28px;transform:rotate(-8deg)}
+  #person.flying { filter:drop-shadow(0 0 12px #fff8); }
+  .hud { display:flex;justify-content:space-between;gap:10px; }
+  .stat { flex:1;background:#202c49;border:1px solid #3b4a70;border-radius:14px;padding:9px 12px;text-align:center; }
+  .stat small {display:block;color:#aebde0;font-size:11px}.stat strong{font-size:22px;font-variant-numeric:tabular-nums}
+  .meter-wrap { background:#202c49;border:1px solid #3b4a70;border-radius:14px;padding:10px 12px; }
+  .meter-label {display:flex;justify-content:space-between;color:#c5d1ec;font-size:12px;margin-bottom:7px}
+  .meter {height:13px;background:#10172b;border-radius:20px;overflow:hidden}
+  #bar {height:100%;width:0%;background:linear-gradient(90deg,#5ce1a5,#ffe16b,#ff715f);border-radius:20px;transition:width .06s}
+  .controls {display:flex;gap:10px}
+  button {border:0;border-radius:15px;padding:15px 12px;font-size:16px;font-weight:750;color:#10172b;background:#ffe16b;flex:1;min-height:52px}
+  button.secondary {background:#344363;color:#fff;border:1px solid #59698e}
+  button:disabled {opacity:.55}
+  #status {text-align:center;color:#bdc9e7;font-size:12px;min-height:18px}
+  .hint {text-align:center;color:#92a4cc;font-size:11px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>📣 声でぶっ飛ばせ！</h1><div class="sub">大声を出すほど、遠くへ吹っ飛ぶ！</div></header>
+  <div id="scene">
+    <div class="sun"></div><div class="horizon"><div class="ground"></div></div>
+    <div id="distanceMark">ここからスタート！</div>
+    <div id="person">
+      <div class="shadow"></div><div class="hair"></div><div class="head"></div>
+      <div class="arm l"></div><div class="arm r"></div><div class="body"></div>
+      <div class="leg l"></div><div class="leg r"></div>
+    </div>
+  </div>
+  <div class="hud">
+    <div class="stat"><small>飛距離</small><strong><span id="dist">0.0</span> m</strong></div>
+    <div class="stat"><small>今回の最高音量</small><strong><span id="peak">0</span>%</strong></div>
+    <div class="stat"><small>ベスト</small><strong><span id="best">0.0</span> m</strong></div>
+  </div>
+  <div class="meter-wrap"><div class="meter-label"><span>マイク音量</span><span id="level">待機中</span></div><div class="meter"><div id="bar"></div></div></div>
+  <div class="controls">
+    <button id="start">🎤 ゲーム開始</button>
+    <button id="reset" class="secondary">リセット</button>
+  </div>
+  <div id="status">開始を押してマイクを許可してください</div>
+  <div class="hint">声を出している間、音量に応じて加速します。静かになると飛距離が確定！<br>※周囲に配慮して遊んでね。</div>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const person = $('person'), scene = $('scene');
+  let audioCtx, analyser, stream, data, running=false, distance=0, peak=0, best=0;
+  let last=0, raf=0, quietTime=0, hasShouted=false, launchTime=0;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function draw() {
+    // Perspective scaling makes the character appear to travel away from the camera.
+    const scale = Math.max(.035, 1 / (1 + distance * .105));
+    const y = 57 - Math.min(22, distance * .30);
+    person.style.top = y + '%';
+    person.style.transform = `translate(-50%,-50%) scale(${scale})`;
+    person.classList.toggle('flying', running && hasShouted);
+    $('dist').textContent = distance.toFixed(1);
+    $('peak').textContent = Math.round(peak);
+    $('best').textContent = best.toFixed(1);
+    $('distanceMark').textContent = distance < .1 ? 'ここからスタート！' : `${distance.toFixed(1)} m`;
+  }
+  async function start() {
+    if (running) return;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      await audioCtx.resume();
+      analyser = audioCtx.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=.35;
+      audioCtx.createMediaStreamSource(stream).connect(analyser);
+      data = new Uint8Array(analyser.fftSize);
+      distance=0;peak=0;quietTime=0;hasShouted=false;running=true;last=performance.now();
+      $('start').disabled=true; $('status').textContent='声を出して！大きい声ほど加速するよ！';
+      raf=requestAnimationFrame(loop);draw();
+    } catch(e) {
+      $('status').textContent = 'マイクを使えません。Safariで開き、マイクを許可してください。';
+    }
+  }
+  function loop(now) {
+    if(!running) return;
+    const dt=clamp((now-last)/1000,0,.05);last=now;
+    analyser.getByteTimeDomainData(data);
+    let sum=0;
+    for(let i=0;i<data.length;i++){const x=(data[i]-128)/128;sum+=x*x;}
+    const rms=Math.sqrt(sum/data.length);
+    // Ignore the room's quiet background; map vocal loudness to 0..100.
+    const raw=clamp((rms-.012)*330,0,100);
+    const shown=raw<4?0:raw;
+    $('bar').style.width=shown+'%'; $('level').textContent=Math.round(shown)+'%';
+    if(shown>7){
+      hasShouted=true;quietTime=0;peak=Math.max(peak,shown);
+      // Louder sound gives disproportionately more thrust, while distance keeps accumulating.
+      const power=Math.pow(shown/100,1.45);
+      distance += (0.8 + power*28) * dt;
+    } else if(hasShouted) {
+      quietTime += dt;
+    }
+    if(hasShouted && quietTime>1.35){
+      running=false;best=Math.max(best,distance);
+      $('status').textContent=`終了！ ${distance.toFixed(1)} m 飛んだ！ もう一度挑戦しよう`;
+      $('start').disabled=false;$('start').textContent='🔁 もう一回挑戦';
+      stopMic();
+    }
+    draw();
+    if(running) raf=requestAnimationFrame(loop);
+  }
+  function stopMic(){
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    if(audioCtx){audioCtx.close();audioCtx=null;}
+    stream=null;
+  }
+  function reset(){
+    running=false;cancelAnimationFrame(raf);stopMic();
+    distance=0;peak=0;quietTime=0;hasShouted=false;
+    $('bar').style.width='0%';$('level').textContent='待機中';
+    $('start').disabled=false;$('start').textContent='🎤 ゲーム開始';
+    $('status').textContent='開始を押してマイクを許可してください';draw();
+  }
+  $('start').addEventListener('click',start);
+  $('reset').addEventListener('click',reset);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden && running)reset();});
+  draw();
+})();
+</script>
+</body>
+</html>
